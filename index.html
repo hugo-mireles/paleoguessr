@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaflet Map Quiz</title>
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""/>
+    <!-- Page CSS -->
+    <link rel="stylesheet" href="test.css">
+</head>
+<body>
+    <div id="quiz-box">
+        <h2 id="prompt">Loading locations...</h2>
+        <div id="score">Score: 0/0</div>
+        <button id="next-btn" onclick="nextQuestion()">Next</button>
+    </div>
+
+    <div id="settings-box">
+        <h2 id="prompt">Paleoguesser</h2>
+        <p id="description">Filter out specific regions to focus on</p>
+
+        <label for="filter-region">Choose a continent:</label>
+        <select name="filter-region" id="filter-region" onchange="update">
+            <option value="all">All</option>
+            <option value="America">America</option>
+            <option value="Europe">Europe</option>
+            <option value="Asia">Asia</option>
+            <option value="Africa">Africa</option>
+            <option value="Oceania">Oceania</option>
+            <option value="Antartica">Antractica</option>
+        </select>
+
+        <fieldset id="filter-cont">
+            <legend>Continents:</legend>
+
+            <input type="checkbox" name="continents" value="america" onchange="updateFilter()"> America
+            <input type="checkbox" name="continents" value="antractica" onchange="updateFilter()"> Antarctica
+            <input type="checkbox" name="continents" value="asia" onchange="updateFilter()"> Asia
+            <input type="checkbox" name="continents" value="australia" onchange="updateFilter()"> Australia
+            <input type="checkbox" name="continents" value="europe" onchange="updateFilter()"> Europe
+            <input type="checkbox" name="continents" value="oceania" onchange="updateFilter()"> Oceania
+        </fieldset>
+        <!-- Start and view buttons -->
+        <button id="start-btn" onclick="switchToPlay()">Start Game</button>
+        <button id="view-btn" onclick="switchToView()">View Locations</button>
+    </div>
+
+    <div id="map"></div>
+
+    <!-- External Leaflet & PapaParse Libraries -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/4.1.2/papaparse.min.js"></script>
+
+    <script src="app.js" defer></script>
+</body>
+</html>
