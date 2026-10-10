@@ -23,13 +23,24 @@ body {
     text-align: center;
 }
 
+.filter-check {
+    display: inline-flex;  
+    align-items: center;   
+    gap: 1px;
+    white-space: nowrap;  
+}
+
+.filter-menu {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
 #settings-box {
     position: absolute; 
     box-sizing: border-box;
     width: calc(100% - 80%);
     height: 100%;
-    /* TODO FIX THE CHECKBOX ISSUE*/ 
-    white-space: no-wrap;
     top: 0; 
     right: 0; 
     z-index: 1000; 

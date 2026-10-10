@@ -1,3 +1,7 @@
+import {showMsgBox, hideMsgBox, setMsg, getFilters, 
+    showNextBtn, hideNextBtn, getLocationFromEvent,
+} from './app-util.js';
+
 // TODO Replace with sheets URL
 const sheetCsvUrl = 'locations.csv';
 
@@ -6,7 +10,7 @@ const mapOptions = {
     maxBounds : L.latLngBounds([-90, -180], [90, 180]),
     maxBoundsViscosity: 0.7,
     minZoom: 2,
-    renderer: L.canvas({ tolerance: 5}), // Extra touch radius
+    renderer: L.canvas({ tolerance: 7}), // Extra touch radius
 }
 const map = L.map('map', mapOptions).setView([20, 0], 2); // Default global view
 
@@ -26,13 +30,20 @@ var Stadia_StamenTonerLines = L.tileLayer('https://tiles.stadiamaps.com/tiles/st
 // Stadia_StamenTonerLines.addTo(map) TODO add if wanted
 Stadia_StamenTonerBackground.addTo(map);
 
+map.createPane('areaPane');
+map.getPane('areaPane').style.zIndex = 450; // Above tiles, below markers
+
+map.createPane('pointPane');
+map.getPane('pointPane').style.zIndex = 460;
+
 const pointOptions = {
-    radius: 4,
+    radius: 5,
     color: '#000000',
-    weight:2,
+    weight: 2,
     fillColor: '#1409f6',
     fillOpacity: 1,
-    interactive:true
+    pane: 'pointPane',
+    interactive: true
 }
 
 const areaOptions = {
@@ -40,16 +51,14 @@ const areaOptions = {
     weight:2,
     fillColor: '#FF0000',
     fillOpacity: 0.3,
-    interactive:true
+    pane: 'areaPane',
+    interactive: true
 }
-
-const msg = document.getElementById("quiz-box");
 
 /** Enum for game state */
 const GAME_STATES = Object.freeze({
     VIEWING: 'VIEWING',
     IN_GAME: 'IN_GAME',
-    GAME_OVER: 'GAME_OVER',
 });
 
 /** ALL Locations with all fields and display */ 
@@ -77,12 +86,16 @@ Papa.parse(sheetCsvUrl, {
         locations = results.data.filter(row => row.name && row.lat && row.lng);
         // Store display object as a field
         locations.forEach((location) => {
-            display = null;
+            // TODO: Make it so that floats are stored as floats
+            for (const key in location) {
+                location[key] = location[key].toLowerCase();
+            }
+            let display = null;
             if(location['border'] != "") {
-                points = JSON.parse(location['border']);
+                let points = JSON.parse(location['border']);
                 display = L.polygon(points, areaOptions);
             } else {
-                coords = [parseFloat(location['lat']),parseFloat(location['lng'])]
+                let coords = [parseFloat(location['lat']),parseFloat(location['lng'])]
                 display = L.circleMarker(coords, pointOptions);
             }
             display.options.location = location;
@@ -96,37 +109,172 @@ Papa.parse(sheetCsvUrl, {
     }
 });
 
+window.switchToPlay = switchToPlay;
+window.switchToView = switchToView;
+window.nextQuestion = nextQuestion;
+window.onFilterUpdate = onFilterUpdate;
+window.flashTips = flashTips;
+
+/**
+ * Start game button callback function
+ * Refreshes locations if coming from previous game
+ * Else just keeps the filters that were on view
+ * Zeros starting state and begins to show questions
+ * TODO Disable tooltips
+ */
 function switchToPlay() {
     if (locations.length === 0) {
-        document.getElementById('prompt').innerText = "No locations found!";
+        setMsg("No locations found!");
+        showMsgBox();
         return;
     }
-    msg.style.display = 'block';
-    clearLocations();
+
+    // Load filters if loading new game from game, else keep view filters
+    // Due to filters not being applied if game active
+    let prevState = gameState;
+    gameState = GAME_STATES.IN_GAME; // Block filter click updates
+    if(prevState == GAME_STATES.IN_GAME) {
+        refreshLocationSet();
+    }
+    if(locationSet == null || locationSet.length == 0) {
+        console.log("SWITCHING TO VIEW LOCATION SET EMPTY");
+        switchToView(); 
+        return;
+    }
+    disableTooltips();
+    locationSet.sort(() => Math.random() - 0.5);
+
+    console.log("Game start locations:", locationSet);
     currentIndex = 0;
     score = 0;
-    // Get filters, plot locations, randomize
-    let filter = document.getElementById('filter-region').value;
-    if(filter == "all") {
-        locationSet = locations.slice();
-    } else {
-        locationSet = locations.filter(location => location.continent == filter);
-    }
-    console.log("Location set: ", locationSet);
-    plotLocations();
-    locations.sort(() => Math.random() - 0.5);
-
-    // TODO Should load borders first and then points
-    // Make so that on click event on these areas validates
-    // Should not be every on click activating through html
-    // Add logic to reset the state of score, index, etc with reset_game()
-    // Add clear_areas() to wipe slate if filters changed
-    // Add support for toggles like seeing previous guesses or not
     
+    showMsgBox();
     showQuestion();
-    
-    // Listen for user clicks on the map(Not current but later with hide features)
+    // Listen for user clicks on the map(Not current but later with hide features filter)
     // map.on('click', onMapClick);
+}
+
+/**
+ * View locations button callback function
+ * Prepares state for viewing mode
+ * Refreshes locations with all filters checked during play
+ * Hides away quiz message
+ * Removes map markers
+ * TODO: Enable tooltips
+ */
+function switchToView() {
+    if (locations.length === 0) {
+        setMsg("No locations found!");
+        showMsgBox();
+        return;
+    }
+    refreshLocationSet();
+    if(locationSet == null || locationSet.length == 0) {
+        console.log("NO ITEMS TO VIEW");
+        return;
+    }
+    enableTooltips();
+    hideMsgBox();
+    gameState = GAME_STATES.VIEWING;
+    if(activeMarker) map.removeLayer(activeMarker);
+    if(guessMarker) map.removeLayer(guessMarker);
+    // Get filters, plot locations, randomize
+    console.log("Location set: ", locationSet);
+}
+
+/**
+ * Main quiz function.
+ * On View:
+ *  Drops a pin onto the clicked location
+ * On Game:
+ *  Drops pin onto clicked location
+ *  Checks if location is correct
+ *  Adds to score, shows guessed location if wrong
+ *  Allow next button to be pressed
+ */
+function onLocationClick(event) {
+    console.log("Click event: ", event);
+    let location = getLocationFromEvent(event);
+    console.log("Clicked location: ", location);
+
+    if(gameState == GAME_STATES.VIEWING) {
+        if(activeMarker) map.removeLayer(activeMarker);
+
+        let pos = [parseFloat(location.lat), parseFloat(location.lng)];
+        activeMarker = L.marker(pos, {interactive:true}).addTo(map)
+                        .bindPopup(`<b>${location.name}</b>`)
+                        .openPopup();
+    } else if(gameState == GAME_STATES.IN_GAME && activeMarker == null){
+        let wantedLocation = locationSet[currentIndex];
+        let pos = [parseFloat(wantedLocation.lat), parseFloat(wantedLocation.lng)];
+        activeMarker = L.marker(pos, {interactive:true}).addTo(map)
+                        .bindPopup(`Answer: <b>${wantedLocation.name}</b>`)
+                        .openPopup();
+        // TODO add getitng user mouse pos
+        if(wantedLocation == location) {
+            score++;
+            setMsg("Correct!", `${score}/${locationSet.length}`)
+        } else {
+            setMsg("Incorrect!", `${score}/${locationSet.length}`);
+            let pos2 = [parseFloat(location.lat), parseFloat(location.lng)];
+            guessMarker = L.marker(pos2, {interactive:true}).addTo(map)
+                        .bindPopup(`You guessed: <b>${location.name}</b>`);
+        }
+        showNextBtn();
+    }
+}
+
+/**
+ * Updates view state on filter change. Leaves alone
+ * in quiz to not interrupt current quiz.
+ */
+function onFilterUpdate(checkbox) {
+    if(gameState == GAME_STATES.VIEWING) {
+        let checked = checkbox.checked;
+        let value = checkbox.value;
+        let name = checkbox.name;
+        console.log("Checked:", checked, "Value:", value, "Name:", name);
+        let filters = getFilters();
+        if(checked) {
+            // Added this filter, look for all that are valid with the new 
+            // value in its section e.g. continent/tag AND also in already
+            // applied filter of other section
+            let additions = [];
+            if(name == 'continents') {
+                additions = locations.filter(location =>
+                    location.continent == value && filters.tags.includes(location.tag)
+                );
+            } else if(name == 'tags'){
+                additions = locations.filter(location =>
+                    location.tag == value && filters.continents.includes(location.continent)
+                );
+            }
+            locationSet.push(...additions);
+            plotGivenArr(additions);
+        } else {
+            let toRemove = null;
+            if(name == 'continents') {
+                console.log("Removing continent:", value);
+                toRemove = locationSet.filter(location => 
+                    !filters.continents.includes(location.continent)
+                );
+                locationSet = locationSet.filter(location => 
+                    filters.continents.includes(location.continent)
+                );
+                console.log("New location set:", locationSet);
+            } else if(name == 'tags'){
+                toRemove = locationSet.filter(location => 
+                    !filters.tags.includes(location.tag)
+                );
+                locationSet = locationSet.filter(location => 
+                    filters.tags.includes(location.tag)
+                );
+            }
+            console.log("LocationSet:", locationSet);
+            console.log("Removing:",toRemove);
+            hideGivenArr(toRemove);
+        }
+    }
 }
 
 function plotLocations() {
@@ -139,73 +287,65 @@ function plotLocations() {
     points.forEach(point => point.display.addTo(map));
 }
 
-function showQuestion() {
-    if (activeMarker) map.removeLayer(activeMarker);
-    if(guessMarker) map.removeLayer(guessMarker);
-    document.getElementById('next-btn').style.display = 'none';
-    document.getElementById('prompt').innerText = `Find: ${locations[currentIndex].name}`;
+function plotGivenArr(arr) {
+    if(!arr) return;
+    arr.forEach(location => {
+        location.display.addTo(map);
+    });
 }
 
+function hideGivenArr(arr) {
+    if(!arr) return;
+    arr.forEach(location => {
+        console.log("Location removed:", location);
+        console.log("Display:", location.display);
+        map.removeLayer(location.display);
+    });
+}
+
+function refreshLocationSet() {
+    hideVisibleLocations();
+    let filters = getFilters();
+    console.log("Game filters:", filters);
+    locationSet = locations.filter(location => 
+        filters.continents.includes(location.continent) && filters.tags.includes(location.tag)
+    );
+    plotLocations();
+}
+
+/**Displays current question to screen */
+function showQuestion() {
+    if (activeMarker) {map.removeLayer(activeMarker); activeMarker=null;}
+    if(guessMarker) {map.removeLayer(guessMarker); guessMarker=null;}
+    hideNextBtn();
+    setMsg(`Find: ${locationSet[currentIndex].name}`, `${score}/${locationSet.length}`);
+}
+
+/**NExt button callback. Moves quiz forward to next question */
 function nextQuestion() {
     currentIndex++;
-    if (currentIndex < locations.length) {
+    if (currentIndex < locationSet.length) {
         showQuestion();
     } else {
-        document.getElementById('prompt').innerText = `Game Over! Final Score: ${score}/${locationSet.length}`;
-        document.getElementById('next-btn').style.display = 'none';
-        map.off('click', onMapClick); // Disable map clicks
+        setMsg(`Game Over! Final Score: ${score}/${locationSet.length}`);
+        hideNextBtn();
+        // map.off('click', onMapClick); // Disable map clicks
     }
 }
 
-function onLocationClick(event) {
-    console.log("Click event: ", event);
-    let location = getLocationFromEvent(event);
-    console.log("Clicked location: ", location);
-
-    if(gameState == GAME_STATES.VIEWING) {
-        if(activeMarker) map.removeLayer(activeMarker);
-
-        let pos = [parseFloat(location.lat), parseFloat(location.lng)];
-        activeMarker = L.marker(pos, {interactive:true}).addTo(map)
-        .bindPopup(`<b>${location.name}</b>`)
-        .openPopup();
-    } else {
-
-    }
-}
-
-// View Locations button callback
-function switchToView() {
-    if (locations.length === 0) {
-        document.getElementById('prompt').innerText = "No locations found!";
-        return;
-    }
-    msg.style.display = 'none';
-    clearLocations();
-    currentIndex = 0;
-    score = 0;
-    // Get filters, plot locations, randomize
-    let filter = document.getElementById('filter-region').value;
-    if(filter == "all") {
-        locationSet = locations.slice();
-    } else {
-        locationSet = locations.filter(location => location.continent == filter);
-    }
-    console.log("Location set: ", locationSet);
-    plotLocations();
-    // locationSet.forEach(location => location.display.openTooltip());
-    locations.sort(() => Math.random() - 0.5);
-}
-
-function getLocationFromEvent(event) {
-    return event.target.options.location;
-}
-
-function clearLocations() {
+function hideVisibleLocations() {
     if(!locationSet) return;
     locationSet.forEach(location => map.removeLayer(location.display));
 }
 
-function updateFilter() {
+function disableTooltips() {
+    locationSet.forEach(location => location.display.unbindTooltip());
+}
 
+function enableTooltips() {
+    locations.forEach(location => location.display.bindTooltip(location.name, {direction: 'top'}));
+}
+
+function flashTips() {
+    locationSet.forEach(location => location.display.openTooltip());
 }

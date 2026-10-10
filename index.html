@@ -9,7 +9,7 @@
     integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
     crossorigin=""/>
     <!-- Page CSS -->
-    <link rel="stylesheet" href="test.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div id="quiz-box">
@@ -20,32 +20,53 @@
 
     <div id="settings-box">
         <h2 id="prompt">Paleoguesser</h2>
-        <p id="description">Filter out specific regions to focus on</p>
+        <p id="description">Filter out specific areas to focus on</p>
 
-        <label for="filter-region">Choose a continent:</label>
-        <select name="filter-region" id="filter-region" onchange="update">
-            <option value="all">All</option>
-            <option value="America">America</option>
-            <option value="Europe">Europe</option>
-            <option value="Asia">Asia</option>
-            <option value="Africa">Africa</option>
-            <option value="Oceania">Oceania</option>
-            <option value="Antartica">Antractica</option>
-        </select>
-
-        <fieldset id="filter-cont">
+        <!-- Continent Filters -->
+        <fieldset id="filter-cont" class="filter-menu">
             <legend>Continents:</legend>
-
-            <input type="checkbox" name="continents" value="america" onchange="updateFilter()"> America
-            <input type="checkbox" name="continents" value="antractica" onchange="updateFilter()"> Antarctica
-            <input type="checkbox" name="continents" value="asia" onchange="updateFilter()"> Asia
-            <input type="checkbox" name="continents" value="australia" onchange="updateFilter()"> Australia
-            <input type="checkbox" name="continents" value="europe" onchange="updateFilter()"> Europe
-            <input type="checkbox" name="continents" value="oceania" onchange="updateFilter()"> Oceania
+            <label class="filter-check">
+                <input type="checkbox" name="continents" value="africa" onchange="onFilterUpdate(this)" checked> Africa
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="continents" value="america" onchange="onFilterUpdate(this)" checked> America
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="continents" value="antractica" onchange="onFilterUpdate(this)" checked> Antarctica
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="continents" value="asia" onchange="onFilterUpdate(this)" checked> Asia
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="continents" value="europe" onchange="onFilterUpdate(this)" checked> Europe
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="continents" value="oceania" onchange="onFilterUpdate(this)" checked> Oceania
+            </label>
+        </fieldset>
+        <!-- Tag Filters -->
+        <fieldset id="filter-tag" class="filter-menu">
+            <legend>Region Types:</legend>
+            <label class="filter-check">
+                <input type="checkbox" name="tags" value="locality" onchange="onFilterUpdate(this)" checked> Localities
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="tags" value="geologic-feature" onchange="onFilterUpdate(this)" checked> Geologic Features
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="tags" value="city" onchange="onFilterUpdate(this)" checked> Cities
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="tags" value="state" onchange="onFilterUpdate(this)" checked> States
+            </label>
+            <label class="filter-check">
+                <input type="checkbox" name="tags" value="country" onchange="onFilterUpdate(this)" checked> Countrys
+            </label>
         </fieldset>
         <!-- Start and view buttons -->
         <button id="start-btn" onclick="switchToPlay()">Start Game</button>
         <button id="view-btn" onclick="switchToView()">View Locations</button>
+        <button id="flash-btn" onclick="flashTips()">Flash Locations</button>
     </div>
 
     <div id="map"></div>
@@ -56,6 +77,6 @@
     crossorigin=""></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/4.1.2/papaparse.min.js"></script>
 
-    <script src="app.js" defer></script>
+    <script src="app.js" type='module' defer></script>
 </body>
 </html>
