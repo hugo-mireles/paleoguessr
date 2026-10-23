@@ -3,14 +3,14 @@ import {showMsgBox, hideMsgBox, setMsg, getFilters,
 } from './app-util.js';
 
 // TODO Replace with sheets URL
-const sheetCsvUrl = 'locations.csv';
+const sheetCsvUrl = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vTzDq_NyP0Ivf1LrqqreaP9QL97QcX940Lokw8h-iv8PvaswgBL4dROUW1yGjcz2kqKyiI9gD2rwA8u/pub?gid=1405018077&single=true&output=csv';
 
 // Initialize Map
 const mapOptions = {
     maxBounds : L.latLngBounds([-90, -180], [90, 180]),
     maxBoundsViscosity: 0.7,
     minZoom: 2,
-    renderer: L.canvas({ tolerance: 7}), // Extra touch radius
+    renderer: L.canvas({ tolerance: 10}), // Extra touch radius
 }
 const map = L.map('map', mapOptions).setView([20, 0], 2); // Default global view
 
@@ -76,32 +76,43 @@ let guessMarker = null;
 /** Current game state */
 let gameState = GAME_STATES.VIEWING;
 
+setMsg("Loading...");
+showMsgBox();
+
 // Fetch and parse the CSV data
 Papa.parse(sheetCsvUrl, {
     download: true,
     header: true,
     complete: function(results) {
+        setMsg("Finished loading");
         console.log("Results arr:", results);
         // Filter out empty rows
         locations = results.data.filter(row => row.name && row.lat && row.lng);
         // Store display object as a field
         locations.forEach((location) => {
-            // TODO: Make it so that floats are stored as floats
-            for (const key in location) {
-                location[key] = location[key].toLowerCase();
-            }
-            let display = null;
-            if(location['border'] != "") {
-                let points = JSON.parse(location['border']);
-                display = L.polygon(points, areaOptions);
-            } else {
-                let coords = [parseFloat(location['lat']),parseFloat(location['lng'])]
-                display = L.circleMarker(coords, pointOptions);
-            }
-            display.options.location = location;
-            display.bindTooltip(location.name, {direction: 'top'});
-            display.on('click', onLocationClick);
-            location['display'] = display;
+            try {
+                // TODO: Make it so that floats are stored as floats
+                for (const key in location) {
+                    location[key] = location[key].toLowerCase();
+                }
+                let display = null;
+                // TODO Pull this data to get finer res
+                if(location['border'] != "") {
+                    let points = JSON.parse(location['border']);
+                    display = L.polygon(points, areaOptions);
+                } else {
+                    let coords = [parseFloat(location['lat']),parseFloat(location['lng'])]
+                    display = L.circleMarker(coords, pointOptions);
+                }
+                display.options.location = location;
+                display.bindTooltip(location.name, {direction: 'top'});
+                display.on('click', onLocationClick);
+                location['display'] = display;
+            } catch (error) {
+                console.error("An error happened:", error.message);
+                setMsg("Display loading error encountered", "Please check the sheet format");
+                process.exit(1);
+            } 
         });
         locationSet = locations.slice(); 
         console.log("Locations:", locations);
@@ -283,8 +294,15 @@ function plotLocations() {
     console.log("Areas:", areas);
     console.log("Points: ", points);
 
-    areas.forEach(area => area.display.addTo(map));
-    points.forEach(point => point.display.addTo(map));
+    try {
+        areas.forEach(area => area.display.addTo(map));
+        points.forEach(point => point.display.addTo(map));
+    } catch (error) {
+        setMsg("Display error!", "Please check sheet format and let me know if issue continues");
+        showMsgBox();
+        process.exit(1);
+    }
+    
 }
 
 function plotGivenArr(arr) {
