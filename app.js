@@ -110,7 +110,7 @@ Papa.parse(sheetCsvUrl, {
                 location['display'] = display;
             } catch (error) {
                 console.error("An error happened:", error.message);
-                setMsg("Display loading error encountered", "Please check the sheet format");
+                setMsg("Display loading error encountered for ",location['name'], "Please check the sheet format");
                 process.exit(1);
             } 
         });
@@ -357,7 +357,11 @@ function hideVisibleLocations() {
 }
 
 function disableTooltips() {
-    locationSet.forEach(location => location.display.unbindTooltip());
+    locationSet.forEach(location => {
+        if(location.display.getTooltip()){
+            location.display.unbindTooltip();
+        }
+    });
 }
 
 function enableTooltips() {
